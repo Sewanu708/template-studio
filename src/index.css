@@ -1,0 +1,28 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* Prevent GrapesJS canvas from leaking its own scrollbars */
+.gjs-editor {
+  height: 100% !important;
+}
+
+.gjs-cv-canvas {
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #eef1f5 !important;
+}
+
+.gjs-cv-canvas-bg,
+.gjs-cv-canvas__frames {
+  background: #eef1f5;
+}

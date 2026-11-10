@@ -1,0 +1,181 @@
+import type { ComponentSchema } from '../schemas/component-schema';
+import { BORDER_STYLE_OPTIONS } from './common';
+
+export const mjImageSchema: ComponentSchema = {
+  type: 'mj-image',
+  label: 'Image',
+  description: 'Responsive image with link and width controls',
+  allowedParents: ['mj-column', 'mj-hero'],
+  allowedChildren: [],
+  droppable: false,
+  groups: [
+    {
+      id: 'source',
+      label: 'Image Source',
+      defaultOpen: true,
+      fields: [
+        {
+          name: 'src',
+          label: 'Image URL',
+          type: 'url',
+          defaultValue: 'https://via.placeholder.com/600x300',
+          placeholder: 'https://cdn.yourbrand.com/banner.png',
+        },
+        {
+          name: 'alt',
+          label: 'Alt Text',
+          type: 'text',
+          defaultValue: '',
+          placeholder: 'Descriptive text for accessibility',
+          helpText: 'Important: screen readers read this and email clients display it when images are disabled.',
+        },
+        {
+          name: 'title',
+          label: 'Title Tooltip',
+          type: 'text',
+          defaultValue: '',
+          placeholder: 'Tooltip on mouse hover',
+        },
+        {
+          name: 'href',
+          label: 'Link Destination',
+          type: 'url',
+          defaultValue: '',
+          placeholder: 'https://example.com/promo',
+        },
+        {
+          name: 'target',
+          label: 'Target',
+          type: 'select',
+          defaultValue: '_blank',
+          options: [
+            { label: 'New Tab (_blank)', value: '_blank' },
+            { label: 'Same Window (_self)', value: '_self' },
+          ],
+        },
+        {
+          name: 'rel',
+          label: 'Rel Attribute',
+          type: 'text',
+          defaultValue: '',
+          placeholder: 'noopener noreferrer',
+        },
+      ],
+    },
+    {
+      id: 'dimensions',
+      label: 'Size & Alignment',
+      defaultOpen: true,
+      fields: [
+        {
+          name: 'width',
+          label: 'Width',
+          type: 'slider',
+          defaultValue: '100%',
+          min: 10,
+          max: 100,
+          step: 1,
+          suffix: '%',
+          helpText: 'Controls image size while keeping the original aspect ratio.',
+        },
+        {
+          name: 'align',
+          label: 'Alignment',
+          type: 'segmented',
+          defaultValue: 'center',
+          options: [
+            { label: 'Left', value: 'left', icon: 'left' },
+            { label: 'Center', value: 'center', icon: 'center' },
+            { label: 'Right', value: 'right', icon: 'right' },
+          ],
+        },
+        {
+          name: 'fluid-on-mobile',
+          label: 'Fluid on Mobile',
+          type: 'checkbox',
+          defaultValue: true,
+          helpText: 'Scale image to 100% width on small screens',
+        },
+      ],
+    },
+    {
+      id: 'appearance',
+      label: 'Border & Corners',
+      defaultOpen: false,
+      fields: [
+        {
+          name: 'border-radius',
+          label: 'Corner Radius',
+          type: 'radius',
+          defaultValue: '0px',
+          units: ['px'],
+          min: 0,
+          max: 60,
+        },
+        {
+          name: 'border',
+          label: 'Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
+        },
+        {
+          name: 'border-style',
+          label: 'Border Style',
+          type: 'select',
+          defaultValue: 'none',
+          options: BORDER_STYLE_OPTIONS,
+        },
+        {
+          name: 'border-width',
+          label: 'Border Width',
+          type: 'unit',
+          defaultValue: '',
+          units: ['px'],
+          min: 0,
+          max: 20,
+        },
+        {
+          name: 'border-color',
+          label: 'Border Color',
+          type: 'color',
+          defaultValue: '',
+        },
+      ],
+    },
+    {
+      id: 'spacing',
+      label: 'Spacing',
+      defaultOpen: false,
+      fields: [
+        {
+          name: 'padding',
+          label: 'Padding',
+          type: 'spacing',
+          defaultValue: '0px',
+        },
+        {
+          name: 'container-background-color',
+          label: 'Container Background',
+          type: 'color',
+          defaultValue: '',
+          placeholder: 'Transparent',
+        },
+      ],
+    },
+    {
+      id: 'advanced',
+      label: 'Advanced',
+      defaultOpen: false,
+      fields: [
+        {
+          name: 'css-class',
+          label: 'CSS Class',
+          type: 'text',
+          defaultValue: '',
+          placeholder: 'e.g. hero-banner',
+        },
+      ],
+    },
+  ],
+};

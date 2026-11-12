@@ -51,7 +51,8 @@ export const canvasCommunicationCss = `
   [data-gjs-type="mj-group"],
   [data-gjs-type="mj-column"] {
     position: relative;
-    transition: outline-color 120ms ease, background-color 120ms ease, opacity 120ms ease;
+    box-sizing: border-box;
+    transition: outline-color 120ms ease, background-color 120ms ease, opacity 120ms ease, min-height 120ms ease;
   }
 
   [data-gjs-type="mj-section"]:hover {
@@ -109,6 +110,87 @@ export const canvasCommunicationCss = `
     background: #ffffff;
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
     transform: translateX(-50%);
+  }
+
+  body.builder-section-drop-buffer-active .builder-section-drop-buffer {
+    display: block;
+  }
+
+  .builder-section-drop-buffer:hover,
+  .builder-section-drop-buffer.drag-over {
+    opacity: 1;
+  }
+
+  .builder-section-drop-buffer {
+    position: relative;
+    display: none;
+    width: 100%;
+    height: 12px;
+    margin: -6px 0;
+    z-index: 50;
+    pointer-events: auto;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+    opacity: 0;
+    transition: opacity 120ms ease, background 120ms ease;
+  }
+
+  .builder-section-drop-buffer:hover,
+  .builder-section-drop-buffer.drag-over {
+    background: rgba(34, 197, 94, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.55);
+  }
+
+  .builder-section-drop-buffer::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 72px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.9);
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  .builder-section-drop-buffer:hover::before,
+  .builder-section-drop-buffer.drag-over::before {
+    opacity: 1;
+  }
+
+  .builder-body-add-section {
+    display: flex;
+    justify-content: center;
+    padding: 16px 0 8px;
+  }
+
+  .builder-body-add-section-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    border-radius: 999px;
+    background: #ffffff;
+    color: #166534;
+    font: 700 13px/1 Inter, system-ui, sans-serif;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+    cursor: pointer;
+    transition: background-color 140ms ease, transform 140ms ease;
+  }
+
+  .builder-body-add-section-button:hover {
+    background: #dcfce7;
+    transform: translateY(-1px);
+  }
+
+  .builder-body-add-section-button:active {
+    background: #bbf7d0;
+    transform: translateY(0);
   }
 
   .builder-section-control-top {
@@ -207,19 +289,6 @@ export const canvasCommunicationCss = `
     box-shadow: 0 0 0 8px var(--builder-green-soft), 0 8px 28px rgba(15, 23, 42, 0.12);
   }
 
-  body.builder-dragging-content [data-gjs-type="mj-column"] {
-    outline: 2px dashed var(--builder-green);
-    outline-offset: -3px;
-    background-color: var(--builder-green-soft);
-  }
-
-  body.builder-dragging-layout-preset [data-gjs-type="mj-column"],
-  body.builder-dragging-layout-preset [data-gjs-type="mj-group"] {
-    outline: 2px dashed var(--builder-green);
-    outline-offset: -3px;
-    background-color: var(--builder-green-soft);
-  }
-
   .builder-drop-valid {
     outline: 3px solid var(--builder-green) !important;
     outline-offset: -3px !important;
@@ -295,6 +364,43 @@ const MOVABLE_CONTENT_TYPES = new Set([
   'mj-spacer',
 ]);
 
+const ROW_CONTAINER_TYPES = ['mj-section', 'mj-group'] as const;
+
+function isRowItemForContainer(container: Component, component: Component): boolean {
+  if (container.is('mj-group')) return component.is('mj-column');
+  return component.is('mj-column') || component.is('mj-group');
+}
+
+function getRowItemElements(container: Component): HTMLElement[] {
+  return container.components()
+    .filter((component: Component) => isRowItemForContainer(container, component))
+    .map((component: Component) => component.getEl())
+    .filter((element): element is HTMLElement => Boolean(element));
+}
+
+function resetEqualHeightItems(items: HTMLElement[]): void {
+  items.forEach((element) => {
+    element.style.minHeight = '';
+    element.removeAttribute('data-builder-equal-height');
+  });
+}
+
+function stretchRowItems(rowItems: HTMLElement[]): void {
+  if (rowItems.length < 2) return;
+
+  const maxHeight = Math.max(
+    ...rowItems.map((element) => element.getBoundingClientRect().height),
+  );
+
+  if (!Number.isFinite(maxHeight) || maxHeight <= 0) return;
+
+  const height = `${Math.ceil(maxHeight)}px`;
+  rowItems.forEach((element) => {
+    element.style.minHeight = height;
+    element.dataset.builderEqualHeight = 'true';
+  });
+}
+
 function getDragKind(block: Block): DragKind {
   const id = block.getId();
   if (getLayoutSpec(block)) return 'layout-preset';
@@ -306,6 +412,8 @@ export const canvasCommunicationPlugin: Plugin = (editor) => {
   let layoutSpec: ColumnLayoutSpec | null = null;
   let highlighted: HTMLElement | null = null;
   let insertionTarget: HTMLElement | null = null;
+  let equalHeightFrame = 0;
+  let imageLoadDocument: Document | null = null;
 
   const clearHighlight = () => {
     highlighted?.classList.remove('builder-drop-valid', 'builder-drop-invalid');
@@ -458,8 +566,62 @@ export const canvasCommunicationPlugin: Plugin = (editor) => {
     if (component) markInvalid(component, 'Invalid drop destination');
   };
 
+  const syncEqualHeightRows = () => {
+    const wrapper = editor.getWrapper();
+    if (!wrapper) return;
+
+    const rowItemsByContainer = ROW_CONTAINER_TYPES.flatMap((type) => (
+      wrapper.findType(type).map(getRowItemElements)
+    ));
+    const allRowItems = Array.from(new Set(rowItemsByContainer.flat()));
+
+    resetEqualHeightItems(allRowItems);
+
+    // Inner layouts first, then sections. This lets a group settle to the
+    // right height before the parent section measures it beside sibling columns.
+    wrapper.findType('mj-group').map(getRowItemElements).forEach(stretchRowItems);
+    wrapper.findType('mj-section').map(getRowItemElements).forEach(stretchRowItems);
+  };
+
+  const scheduleEqualHeightSync = () => {
+    if (equalHeightFrame) return;
+
+    const canvasWindow = editor.Canvas.getWindow();
+    const requestFrame = canvasWindow?.requestAnimationFrame
+      ?? window.requestAnimationFrame;
+
+    equalHeightFrame = requestFrame(() => {
+      equalHeightFrame = 0;
+      syncEqualHeightRows();
+    });
+  };
+
+  const handleCanvasImageLoad = (event: Event) => {
+    const target = event.target;
+    if (!target || (target as Element).tagName !== 'IMG') return;
+    scheduleEqualHeightSync();
+  };
+
+  const bindCanvasImageLoadSync = () => {
+    const canvasDocument = editor.Canvas.getDocument();
+    if (!canvasDocument || imageLoadDocument === canvasDocument) return;
+
+    imageLoadDocument?.removeEventListener('load', handleCanvasImageLoad, true);
+    canvasDocument.addEventListener('load', handleCanvasImageLoad, true);
+    imageLoadDocument = canvasDocument;
+  };
+
+  editor.onReady(() => {
+    bindCanvasImageLoadSync();
+    scheduleEqualHeightSync();
+  });
+
   editor.on('block:drag:start', startDrag);
   editor.on('component:drag:start', startComponentDrag);
   editor.on('canvas:dragover', updateDropFeedback);
   editor.on('block:drag:stop component:drag:end canvas:dragend', clearDragState);
+  editor.on('component:add component:update component:remove canvas:refresh canvas:frame:load', () => {
+    bindCanvasImageLoadSync();
+    scheduleEqualHeightSync();
+  });
 };

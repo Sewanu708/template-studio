@@ -1,7 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import type { Component, Editor } from 'grapesjs';
 import { getComponentSchema } from '../../editor/components/definitions/registry';
+import {
+  applySectionColumnGap,
+  getSectionColumnGapValue,
+  SECTION_COLUMN_GAP_FIELD,
+} from '../../editor/layout/column-gap';
+import { ContentField } from './controls/content-field';
 import { FieldRenderer } from './controls/field-renderer';
+import { ImageSettingsPanel } from './panels/image-settings-panel';
+
+const BOX_BORDER_ATTRS = [
+  'border',
+  'border-top',
+  'border-right',
+  'border-bottom',
+  'border-left',
+];
+
+const LEGACY_BORDER_PART_ATTRS = [
+  'border-width',
+  'border-style',
+  'border-color',
+];
 
 interface RightInspectorProps {
   editor: Editor | null;
@@ -45,37 +66,76 @@ export function RightInspector({ editor }: RightInspectorProps) {
     );
   }
 
-  const rawType = selected.get('type') as string;
-  const tagName = String(selected.get('tagName') ?? '');
+  const inspectable = getInspectableComponent(selected);
+  const rawType = inspectable.get('type') as string;
+  const tagName = String(inspectable.get('tagName') ?? '');
   const type = rawType === 'wrapper' ? 'mj-body' : (rawType || tagName);
   const schema = getComponentSchema(type);
-  const displayName = selected.get('custom-name') || schema?.label || type || 'Component';
-  const attrs = selected.getAttributes() as Record<string, string>;
-  const stylesObj = (selected.getStyle() ?? {}) as Record<string, string>;
+  const displayName = inspectable.get('custom-name') || schema?.label || type || 'Component';
+  const attrs = inspectable.getAttributes() as Record<string, string>;
+  const stylesObj = (inspectable.getStyle() ?? {}) as Record<string, string>;
 
   const handleAttrChange = (attrName: string, nextValue: string) => {
-    if (!selected) return;
+    if (!inspectable) return;
 
-    if (nextValue === '' || nextValue === undefined) {
-      const updated = { ...selected.getAttributes() };
-      delete updated[attrName];
-      selected.set('attributes', updated);
-    } else {
-      selected.addAttributes({ [attrName]: nextValue });
+    if (type === 'mj-section' && attrName === SECTION_COLUMN_GAP_FIELD) {
+      applySectionColumnGap(inspectable, nextValue);
+      setRevision((rev) => rev + 1);
+      return;
+    }
+
+    const attrsToRemove = getConflictingAttributesForChange(type, attrName);
+    const shouldRemoveAttr = (
+      nextValue === ''
+      || nextValue === undefined
+      || isEmptyBoxBorderValue(type, attrName, nextValue)
+    );
+
+    if (shouldRemoveAttr) {
+      attrsToRemove.push(attrName);
+    }
+
+    if (attrsToRemove.length) {
+      inspectable.removeAttributes([...new Set(attrsToRemove)]);
+    }
+
+    if (!shouldRemoveAttr) {
+      inspectable.addAttributes({ [attrName]: nextValue });
     }
 
     setRevision((rev) => rev + 1);
   };
 
+  const handleAttrsChange = (updates: Record<string, string>) => {
+    if (!inspectable) return;
+
+    const attrsToRemove: string[] = [];
+    const attrsToAdd: Record<string, string> = {};
+
+    Object.entries(updates).forEach(([attrName, nextValue]) => {
+      if (nextValue === '' || nextValue === undefined) {
+        attrsToRemove.push(attrName);
+      } else {
+        attrsToAdd[attrName] = nextValue;
+      }
+    });
+
+    if (attrsToRemove.length) inspectable.removeAttributes(attrsToRemove);
+    if (Object.keys(attrsToAdd).length) inspectable.addAttributes(attrsToAdd);
+
+    setRevision((rev) => rev + 1);
+  };
+
   const handleContentChange = (newContent: string) => {
-    if (!selected) return;
-    selected.components(newContent);
+    if (!inspectable) return;
+    inspectable.components(newContent);
     setRevision((rev) => rev + 1);
   };
 
   // Determine if component supports text content editing
   const hasTextContent = type === 'mj-text' || type === 'mj-button';
-  const currentContent = hasTextContent ? getComponentContent(selected) : '';
+  const currentContent = hasTextContent ? getComponentContent(inspectable) : '';
+  const isImage = type === 'mj-image';
 
   return (
     <div style={styles.panel}>
@@ -89,54 +149,59 @@ export function RightInspector({ editor }: RightInspectorProps) {
       <div style={styles.scrollArea}>
         {/* Quick Text Content Editor */}
         {hasTextContent && (
-          <details open style={styles.group}>
-            <summary style={styles.groupLabel}>
-              <span>Content</span>
-              <span style={styles.groupChevron}>▾</span>
-            </summary>
+          <section style={styles.group}>
+            <div style={styles.groupLabel}>Content</div>
             <div style={styles.fields}>
-              <div style={styles.contentFieldRow}>
-                <label style={styles.contentFieldLabel}>
-                  {type === 'mj-button' ? 'Button Label' : 'Text Content'}
-                </label>
-                <textarea
-                  value={currentContent}
-                  onChange={(e) => handleContentChange(e.target.value)}
-                  style={styles.contentTextarea}
-                  rows={type === 'mj-button' ? 2 : 4}
-                  placeholder="Enter text..."
-                />
-              </div>
+              <ContentField
+                label={type === 'mj-button' ? 'Button Label' : 'Text Content'}
+                value={currentContent}
+                onChange={handleContentChange}
+                rows={type === 'mj-button' ? 2 : 5}
+                placeholder={type === 'mj-button' ? 'Enter button label...' : 'Enter text...'}
+              />
             </div>
-          </details>
+          </section>
+        )}
+
+        {isImage && editor && (
+          <ImageSettingsPanel
+            component={inspectable}
+            editor={editor}
+            attrs={attrs}
+            onChange={handleAttrChange}
+            onAttrsChange={handleAttrsChange}
+            onRefresh={() => setRevision((rev) => rev + 1)}
+          />
         )}
 
         {/* Schema Groups */}
         {schema ? (
-          schema.groups.map((group) => (
-            <details
-              key={group.id}
-              open={group.defaultOpen ?? true}
-              style={styles.group}
-            >
-              <summary style={styles.groupLabel}>
-                <span>{group.label}</span>
-                <span style={styles.groupChevron}>▾</span>
-              </summary>
+          schema.groups.filter(() => (
+            !isImage
+          )).map((group) => (
+            <section key={group.id} style={styles.group}>
+              <div style={styles.groupLabel}>{group.label}</div>
               <div style={styles.fields}>
                 {group.fields.map((field) => {
-                  const currentValue = attrs[field.name] ?? stylesObj[field.name];
+                  const currentValue = (
+                    type === 'mj-section' && field.name === SECTION_COLUMN_GAP_FIELD
+                      ? getSectionColumnGapValue(inspectable)
+                      : attrs[field.name] ?? stylesObj[field.name]
+                  );
                   return (
                     <FieldRenderer
                       key={field.name}
                       field={field}
                       value={currentValue}
                       onChange={(nextVal) => handleAttrChange(field.name, nextVal)}
+                      editor={editor}
+                      attrs={attrs}
+                      onAttrsChange={handleAttrsChange}
                     />
                   );
                 })}
               </div>
-            </details>
+            </section>
           ))
         ) : (
           <div style={styles.unsupportedNotice}>
@@ -146,6 +211,64 @@ export function RightInspector({ editor }: RightInspectorProps) {
       </div>
     </div>
   );
+}
+
+function getComponentType(component: Component): string {
+  return String(component.get('type') ?? component.get('tagName') ?? '');
+}
+
+function isBoxBorderAttribute(type: string, attrName: string): boolean {
+  return type !== 'mj-divider' && BOX_BORDER_ATTRS.includes(attrName);
+}
+
+function isEmptyBoxBorderValue(type: string, attrName: string, value: string): boolean {
+  return isBoxBorderAttribute(type, attrName) && value === 'none';
+}
+
+function getConflictingAttributesForChange(type: string, attrName: string): string[] {
+  if (type === 'mj-divider') return [];
+
+  if (attrName === 'border') {
+    return [
+      ...BOX_BORDER_ATTRS.filter((name) => name !== 'border'),
+      ...LEGACY_BORDER_PART_ATTRS,
+    ];
+  }
+
+  if (BOX_BORDER_ATTRS.includes(attrName)) {
+    return [
+      'border',
+      ...LEGACY_BORDER_PART_ATTRS,
+    ];
+  }
+
+  if (LEGACY_BORDER_PART_ATTRS.includes(attrName)) {
+    return ['border'];
+  }
+
+  return [];
+}
+
+function getInspectableComponent(component: Component): Component {
+  const type = getComponentType(component);
+  const parent = component.parent();
+
+  if (
+    type === 'text'
+    && parent
+    && (parent.is('mj-text') || parent.is('mj-button'))
+  ) {
+    return parent;
+  }
+
+  if (!getComponentSchema(type) && parent) {
+    const parentType = getComponentType(parent);
+    if (getComponentSchema(parentType)) {
+      return parent;
+    }
+  }
+
+  return component;
 }
 
 function getComponentContent(component: Component): string {
@@ -206,45 +329,12 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     color: '#6b7280',
-    cursor: 'pointer',
-    userSelect: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    listStyle: 'none',
-  },
-  groupChevron: {
-    fontSize: 10,
-    color: '#9ca3af',
   },
   fields: {
     padding: '4px 16px 14px',
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
-  },
-  contentFieldRow: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  contentFieldLabel: {
-    fontSize: 12,
-    fontWeight: 500,
-    color: '#4b5563',
-  },
-  contentTextarea: {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '6px 8px',
-    fontSize: 12,
-    color: '#111827',
-    border: '1px solid #d1d5db',
-    borderRadius: 5,
-    outline: 'none',
-    fontFamily: 'inherit',
-    lineHeight: 1.4,
-    resize: 'vertical',
   },
   empty: {
     display: 'flex',

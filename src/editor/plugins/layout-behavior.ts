@@ -20,6 +20,19 @@ const BODY_CHILD_TYPES = new Set([
   'mj-raw',
 ]);
 
+const COLUMN_ONLY_CHILD_TYPES = new Set([
+  'mj-accordion',
+  'mj-button',
+  'mj-carousel',
+  'mj-divider',
+  'mj-image',
+  'mj-navbar',
+  'mj-social',
+  'mj-spacer',
+  'mj-table',
+  'mj-text',
+]);
+
 interface SorterDragEvent {
   targetModel?: Component | null;
 }
@@ -31,7 +44,7 @@ function getComponentType(content: ContentType): string | null {
 
 function wrapForBody(content: ContentType): ContentType {
   if (typeof content !== 'string') return content;
-  return `<mj-section padding="0px">
+  return `<mj-section padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
   <mj-column padding="0px">
     ${content}
   </mj-column>
@@ -80,6 +93,14 @@ function createInnerLayout(column: Component, ratios: number[]): ComponentDefini
 
 function createColumnMarker(): string {
   return '<mj-column padding="0px"></mj-column>';
+}
+
+function isType(component: Component | null | undefined, type: string): boolean {
+  return Boolean(
+    component?.is(type)
+    || component?.get('type') === type
+    || component?.get('tagName') === type,
+  );
 }
 
 function setColumnWidth(column: Component, ratio: number): void {
@@ -147,6 +168,7 @@ function addPresetColumns(
  */
 export const layoutBehaviorPlugin: Plugin = (editor) => {
   let activeBlockDrag = false;
+  let activeExistingContentDrag = false;
   let activePrimitiveBlock = false;
   let activeLayoutSpec: ColumnLayoutSpec | null = null;
   let dropDirectlyOnBody = false;
@@ -156,6 +178,7 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
   let hoveredSection: Component | null = null;
   let sectionInsertIndex: number | null = null;
   let hoveringAnyColumn = false;
+  let pendingSectionInsertion: { section: Component; position: 'before' | 'after' } | null = null;
   let hoveringAnyGroup = false;
   let hoveringAnySection = false;
   const primitiveTypes = new Set<string>();
@@ -172,6 +195,7 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
     }
     if (target.is('mj-group')) return hoveredInnerLayout === target;
     if (target.is('mj-section')) {
+      if (hoveredSection === target && hasDirectPrimitiveChildren(target)) return true;
       if (activeLayoutSpec?.kind === 'column') return hoveredSection === target;
       return (
         Boolean(activeLayoutSpec?.supportsInnerLayout)
@@ -187,11 +211,166 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
     || String(source.get('tagName') ?? '')
   );
 
+  const createEmptySectionMarkup = (): string => (`<mj-section background-color="#ffffff" padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
+  <mj-column padding="0px"></mj-column>
+</mj-section>`);
+
+  const findComponentById = (id: string): Component | null => {
+    const wrapper = editor.getWrapper();
+    if (!wrapper) return null;
+
+    const queue: Component[] = [wrapper];
+    while (queue.length) {
+      const current = queue.shift();
+      if (!current) continue;
+      if (current.getId() === id) return current;
+      queue.push(...current.components());
+    }
+
+    return null;
+  };
+
+  const createSectionBuffer = (section: Component, position: 'before' | 'after') => {
+    const element = section.getEl();
+    if (!element || !element.parentNode) return null;
+
+    const buffer = element.ownerDocument.createElement('div');
+    buffer.className = `builder-section-drop-buffer builder-section-drop-buffer-${position}`;
+    buffer.dataset.sectionId = section.getId();
+    buffer.dataset.insertPosition = position;
+    buffer.setAttribute('aria-hidden', 'true');
+
+    if (position === 'before') {
+      element.parentNode.insertBefore(buffer, element);
+    } else {
+      element.parentNode.insertBefore(buffer, element.nextSibling);
+    }
+
+    return buffer;
+  };
+
+  const clearSectionDropBuffers = () => {
+    const canvasDocument = editor.Canvas.getDocument();
+    const canvasBody = editor.Canvas.getBody();
+
+    canvasBody?.classList.remove('builder-section-drop-buffer-active');
+    canvasDocument
+      ?.querySelectorAll('.builder-section-drop-buffer')
+      .forEach((node) => node.remove());
+  };
+
+  const clearSectionBufferHover = () => {
+    editor.Canvas.getDocument()
+      ?.querySelectorAll('.builder-section-drop-buffer.drag-over')
+      .forEach((node) => node.classList.remove('drag-over'));
+  };
+
+  const syncSectionDropBuffers = () => {
+    const body = editor.getWrapper()?.findType('mj-body')[0]?.getEl();
+    if (!body) return;
+
+    body.querySelectorAll('.builder-section-drop-buffer').forEach((node) => node.remove());
+
+    if (!activeBlockDrag && !activeExistingContentDrag) return;
+
+    editor.getWrapper()?.findType('mj-section').forEach((section, index) => {
+      if (index === 0) createSectionBuffer(section, 'before');
+      createSectionBuffer(section, 'after');
+    });
+  };
+
+  const getBodyInsertIndex = (
+    section: Component,
+    position: 'before' | 'after',
+    droppedComponent?: Component | null,
+  ): number => {
+    const baseIndex = section.index() + (position === 'after' ? 1 : 0);
+    const body = section.parent();
+
+    if (
+      droppedComponent
+      && body
+      && droppedComponent.parent() === body
+      && droppedComponent.index() < baseIndex
+    ) {
+      return baseIndex - 1;
+    }
+
+    return baseIndex;
+  };
+
+  const getFirstColumn = (section: Component | undefined): Component | null => (
+    section?.components().find((child: Component) => child.is('mj-column')) ?? null
+  );
+
+  const handleSectionBufferDrop = (droppedComponent: Component | null | undefined): boolean => {
+    if (!pendingSectionInsertion) return false;
+
+    const { section, position } = pendingSectionInsertion;
+    const body = section.parent();
+    if (!body?.is('mj-body')) return false;
+
+    const insertAt = getBodyInsertIndex(section, position, droppedComponent);
+
+    if (droppedComponent && BODY_CHILD_TYPES.has(getSourceType(droppedComponent))) {
+      droppedComponent.move(body, { at: insertAt });
+      editor.select(droppedComponent);
+      pendingSectionInsertion = null;
+      clearSectionBufferHover();
+      clearSectionDropBuffers();
+      return true;
+    }
+
+    const [newSection] = body.append<Component>(createEmptySectionMarkup(), { at: insertAt });
+    const targetColumn = getFirstColumn(newSection);
+
+    if (droppedComponent && targetColumn && droppedComponent.parent() !== targetColumn) {
+      droppedComponent.move(targetColumn, { at: targetColumn.components().length });
+    }
+
+    if (newSection) {
+      configureSectionDroppable(newSection);
+      targetColumn && configureColumnDroppable(targetColumn);
+      editor.select(newSection);
+    }
+
+    pendingSectionInsertion = null;
+    clearSectionBufferHover();
+    clearSectionDropBuffers();
+    return true;
+  };
+
+  const wrapBodyDroppedPrimitive = (droppedComponent: Component | null | undefined): boolean => {
+    if (!droppedComponent || !isPrimitiveComponent(droppedComponent)) return false;
+
+    const body = droppedComponent.parent();
+    if (!body?.is('mj-body')) return false;
+
+    const insertAt = droppedComponent.index();
+    const [newSection] = body.append<Component>(createEmptySectionMarkup(), { at: insertAt });
+    const targetColumn = getFirstColumn(newSection);
+
+    if (targetColumn) {
+      droppedComponent.move(targetColumn, { at: 0 });
+    }
+
+    if (newSection) {
+      configureSectionDroppable(newSection);
+      targetColumn && configureColumnDroppable(targetColumn);
+      editor.select(newSection);
+    }
+
+    return true;
+  };
+
   const configureSectionDroppable = (section: Component) => {
     editor.UndoManager.skip(() => {
       section.set('droppable', (source: Component) => {
         if (activeBlockDrag) {
           if (activePrimitiveBlock) return hoveredEmptySection === section;
+          if (activeLayoutSpec && hoveredSection === section && hasDirectPrimitiveChildren(section)) {
+            return true;
+          }
           if (activeLayoutSpec?.kind === 'column') return hoveredSection === section;
           return Boolean(
             activeLayoutSpec?.supportsInnerLayout
@@ -220,8 +399,80 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
     editor.UndoManager.skip(() => {
       component.set('draggable', (_source: Component, target: Component) => (
         target.is('mj-column')
+        || (activeExistingContentDrag && target.is('mj-body'))
       ));
     });
+  };
+
+  const isPrimitiveComponent = (component: Component): boolean => (
+    primitiveTypes.has(getSourceType(component))
+    || COLUMN_ONLY_CHILD_TYPES.has(getSourceType(component))
+  );
+
+  const hasDirectPrimitiveChildren = (container: Component): boolean => (
+    container.components().some((child: Component) => isPrimitiveComponent(child))
+  );
+
+  const configureCreatedLayoutShell = (component: Component) => {
+    if (isType(component, 'mj-section')) configureSectionDroppable(component);
+    if (isType(component, 'mj-column')) configureColumnDroppable(component);
+  };
+
+  const wrapDirectPrimitiveChildrenInColumn = (section: Component): Component | null => {
+    const directPrimitiveChildren = section.components().filter((child: Component) => (
+      isPrimitiveComponent(child)
+    ));
+
+    if (!directPrimitiveChildren.length) return null;
+
+    const insertAt = Math.min(...directPrimitiveChildren.map((child) => child.index()));
+    const [column] = section.append<Component>({
+      type: 'mj-column',
+      tagName: 'mj-column',
+      attributes: { padding: '0px' },
+    }, { at: insertAt });
+
+    if (!column) return null;
+
+    configureCreatedLayoutShell(column);
+    directPrimitiveChildren.forEach((child, index) => {
+      child.move(column, { at: index });
+    });
+
+    return column;
+  };
+
+  const repairSectionForLayoutDrop = (
+    section: Component,
+    droppedColumn: Component,
+    spec: ColumnLayoutSpec,
+  ) => {
+    wrapDirectPrimitiveChildrenInColumn(section);
+
+    const targetCount = spec.kind === 'columns'
+      ? spec.ratios.length
+      : getLayoutChildren(section).length;
+
+    while (getLayoutChildren(section).length < targetCount) {
+      const [column] = section.append<Component>({
+        type: 'mj-column',
+        tagName: 'mj-column',
+        attributes: { padding: '0px' },
+      }, { at: droppedColumn.index() + 1 });
+
+      if (column) configureCreatedLayoutShell(column);
+    }
+
+    const children = getLayoutChildren(section);
+
+    if (spec.kind === 'columns' && children.length === spec.ratios.length) {
+      const ratios = normalizeRatios(spec.ratios);
+      children.forEach((child, index) => setColumnWidth(child, ratios[index]));
+    } else {
+      distributeEqually(section);
+    }
+
+    editor.select(droppedColumn);
   };
 
   editor.Blocks.getAll().forEach((block: Block) => {
@@ -259,9 +510,9 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
         ? createInnerLayout(hoveredColumn, spec.ratios)
         : hoveredInnerLayout
           ? createColumnMarker()
-          : hoveredSection && spec.kind === 'column'
+          : hoveredSection && (spec.kind === 'column' || hasDirectPrimitiveChildren(hoveredSection))
             ? createColumnMarker()
-          : content,
+            : content,
       dragDef: {
         type: 'mj-column',
         draggable: canDragLayoutPreset,
@@ -303,6 +554,7 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
 
   editor.on('block:drag:start', (block) => {
     activeBlockDrag = true;
+    activeExistingContentDrag = false;
     activePrimitiveBlock = block.getId().startsWith(PRIMITIVE_BLOCK_PREFIX);
     const layoutSpec = getLayoutSpec(block);
     activeLayoutSpec = layoutSpec;
@@ -312,15 +564,55 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
     hoveredInnerLayout = null;
     hoveredSection = null;
     sectionInsertIndex = null;
+    pendingSectionInsertion = null;
     hoveringAnyColumn = false;
     hoveringAnyGroup = false;
     hoveringAnySection = false;
+    editor.Canvas.getBody()?.classList.add('builder-section-drop-buffer-active');
+    syncSectionDropBuffers();
+  });
+
+  editor.on('component:drag:start', ({ target }: { target?: Component }) => {
+    if (!target || !isPrimitiveComponent(target)) return;
+
+    activeBlockDrag = false;
+    activeExistingContentDrag = true;
+    activePrimitiveBlock = true;
+    activeLayoutSpec = null;
+    dropDirectlyOnBody = false;
+    hoveredEmptySection = null;
+    hoveredColumn = null;
+    hoveredInnerLayout = null;
+    hoveredSection = null;
+    sectionInsertIndex = null;
+    pendingSectionInsertion = null;
+    hoveringAnyColumn = false;
+    hoveringAnyGroup = false;
+    hoveringAnySection = false;
+    editor.Canvas.getBody()?.classList.add('builder-section-drop-buffer-active');
+    syncSectionDropBuffers();
   });
 
   editor.on('canvas:dragover', (event: Event) => {
-    if (!activeBlockDrag) return;
+    if (!activeBlockDrag && !activeExistingContentDrag) return;
 
     const target = event.target as HTMLElement | null;
+    const buffer = target?.closest<HTMLElement>('.builder-section-drop-buffer');
+    if (buffer) {
+      const sectionId = buffer.dataset.sectionId;
+      const sectionModel = sectionId ? findComponentById(sectionId) : null;
+      const position = buffer.dataset.insertPosition as 'before' | 'after' | undefined;
+
+      if (sectionModel && position) {
+        pendingSectionInsertion = { section: sectionModel, position };
+        clearSectionBufferHover();
+        buffer.classList.add('drag-over');
+      }
+    } else {
+      pendingSectionInsertion = null;
+      clearSectionBufferHover();
+    }
+
     const columnElement = target?.closest<HTMLElement>('[data-gjs-type="mj-column"]');
     const groupElement = target?.closest<HTMLElement>('[data-gjs-type="mj-group"]');
     const sectionElement = target?.closest<HTMLElement>('[data-gjs-type="mj-section"]');
@@ -361,7 +653,9 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
         : section?.is('mj-section')
           ? section
           : null
-      : null;
+      : section?.is('mj-section') && hasDirectPrimitiveChildren(section)
+        ? section
+        : null;
     sectionInsertIndex = null;
 
     if (hoveredSection) {
@@ -382,9 +676,17 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
   });
 
   editor.on('canvas:drop', (_dataTransfer, dropped: Component | Component[]) => {
-    if (!activeLayoutSpec) return;
-
     const droppedComponent = Array.isArray(dropped) ? dropped[0] : dropped;
+
+    if (handleSectionBufferDrop(droppedComponent)) {
+      return;
+    }
+
+    if (activeExistingContentDrag && wrapBodyDroppedPrimitive(droppedComponent)) {
+      return;
+    }
+
+    if (!activeLayoutSpec) return;
 
     if (hoveredInnerLayout) {
       if (!droppedComponent?.is('mj-column')) return;
@@ -402,6 +704,11 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
     if (hoveredSection) {
       if (!droppedComponent?.is('mj-column')) return;
       if (droppedComponent.parent() !== hoveredSection) return;
+
+      if (hasDirectPrimitiveChildren(hoveredSection)) {
+        repairSectionForLayoutDrop(hoveredSection, droppedComponent, activeLayoutSpec);
+        return;
+      }
 
       if (sectionInsertIndex !== null && droppedComponent.index() !== sectionInsertIndex) {
         const moveAt = droppedComponent.index() < sectionInsertIndex
@@ -454,8 +761,9 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
     configureExistingContent(component);
   });
 
-  editor.on('block:drag:stop canvas:dragend', () => {
+  editor.on('block:drag:stop component:drag:end canvas:dragend', () => {
     activeBlockDrag = false;
+    activeExistingContentDrag = false;
     activePrimitiveBlock = false;
     activeLayoutSpec = null;
     dropDirectlyOnBody = false;
@@ -464,8 +772,10 @@ export const layoutBehaviorPlugin: Plugin = (editor) => {
     hoveredInnerLayout = null;
     hoveredSection = null;
     sectionInsertIndex = null;
+    pendingSectionInsertion = null;
     hoveringAnyColumn = false;
     hoveringAnyGroup = false;
     hoveringAnySection = false;
+    clearSectionDropBuffers();
   });
 };

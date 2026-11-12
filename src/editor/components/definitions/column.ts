@@ -1,5 +1,5 @@
 import type { ComponentSchema } from '../schemas/component-schema';
-import { BORDER_STYLE_OPTIONS, VERTICAL_ALIGN_OPTIONS } from './common';
+import { VERTICAL_ALIGN_OPTIONS } from './common';
 
 export const mjColumnSchema: ComponentSchema = {
   type: 'mj-column',
@@ -31,11 +31,22 @@ export const mjColumnSchema: ComponentSchema = {
           options: VERTICAL_ALIGN_OPTIONS,
           helpText: 'Align content to the top, middle, or bottom of this column',
         },
+        {
+          name: 'direction',
+          label: 'Direction',
+          type: 'select',
+          defaultValue: 'ltr',
+          options: [
+            { label: 'Left to Right', value: 'ltr' },
+            { label: 'Right to Left', value: 'rtl' },
+          ],
+          helpText: 'Controls the column content direction for email clients that support it',
+        },
       ],
     },
     {
       id: 'appearance',
-      label: 'Background & Border',
+      label: 'Background',
       defaultOpen: true,
       fields: [
         {
@@ -44,44 +55,6 @@ export const mjColumnSchema: ComponentSchema = {
           type: 'color',
           defaultValue: '',
           placeholder: 'Transparent',
-        },
-        {
-          name: 'border-radius',
-          label: 'Corner Radius',
-          type: 'radius',
-          defaultValue: '0px',
-          units: ['px'],
-          min: 0,
-          max: 40,
-        },
-        {
-          name: 'border',
-          label: 'Border',
-          type: 'border',
-          defaultValue: 'none',
-          placeholder: '1px solid #e5e7eb',
-        },
-        {
-          name: 'border-style',
-          label: 'Border Style',
-          type: 'select',
-          defaultValue: 'none',
-          options: BORDER_STYLE_OPTIONS,
-        },
-        {
-          name: 'border-width',
-          label: 'Border Width',
-          type: 'unit',
-          defaultValue: '',
-          units: ['px'],
-          min: 0,
-          max: 20,
-        },
-        {
-          name: 'border-color',
-          label: 'Border Color',
-          type: 'color',
-          defaultValue: '',
         },
       ],
     },
@@ -96,6 +69,57 @@ export const mjColumnSchema: ComponentSchema = {
           type: 'spacing',
           defaultValue: '0px',
           helpText: 'Internal spacing inside this column container',
+        },
+      ],
+    },
+    {
+      id: 'border',
+      label: 'Border & Corners',
+      defaultOpen: true,
+      fields: [
+        {
+          name: 'border',
+          label: 'All Sides',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
+        },
+        {
+          name: 'border-top',
+          label: 'Top Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
+        },
+        {
+          name: 'border-right',
+          label: 'Right Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
+        },
+        {
+          name: 'border-bottom',
+          label: 'Bottom Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
+        },
+        {
+          name: 'border-left',
+          label: 'Left Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
+        },
+        {
+          name: 'border-radius',
+          label: 'Corner Radius',
+          type: 'radius',
+          defaultValue: '0px',
+          units: ['px'],
+          min: 0,
+          max: 40,
         },
       ],
     },

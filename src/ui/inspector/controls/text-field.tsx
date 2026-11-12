@@ -4,6 +4,10 @@ interface TextFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  actionLabel?: string;
+  actionTitle?: string;
+  onAction?: () => void;
+  onClear?: () => void;
   isTextarea?: boolean;
   isUrl?: boolean;
   placeholder?: string;
@@ -14,6 +18,10 @@ export function TextField({
   label,
   value,
   onChange,
+  actionLabel,
+  actionTitle,
+  onAction,
+  onClear,
   isTextarea = false,
   isUrl = false,
   placeholder,
@@ -52,6 +60,28 @@ export function TextField({
               style={styles.input}
               aria-label={label}
             />
+            {onClear && value && (
+              <button
+                type="button"
+                style={styles.clearButton}
+                onClick={onClear}
+                title={`Remove ${label}`}
+                aria-label={`Remove ${label}`}
+              >
+                ✕
+              </button>
+            )}
+            {onAction && (
+              <button
+                type="button"
+                style={styles.actionButton}
+                onClick={onAction}
+                title={actionTitle}
+                aria-label={actionTitle ?? actionLabel}
+              >
+                {actionLabel}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -112,6 +142,28 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     outline: 'none',
     background: 'transparent',
+  },
+  clearButton: {
+    alignSelf: 'stretch',
+    padding: '0 7px',
+    border: 'none',
+    borderLeft: '1px solid #e5e7eb',
+    background: '#ffffff',
+    color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  actionButton: {
+    alignSelf: 'stretch',
+    padding: '0 8px',
+    border: 'none',
+    borderLeft: '1px solid #e5e7eb',
+    background: '#f9fafb',
+    color: '#16a34a',
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
   },
   textarea: {
     width: '100%',

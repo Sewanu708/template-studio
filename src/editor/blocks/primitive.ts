@@ -10,7 +10,7 @@ export const textBlock: BlockProperties = {
   media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M4 6h16M4 12h10M4 18h14"/>
   </svg>`,
-  content: `<mj-text font-size="14px" color="#333333" padding="0px">Edit your text here</mj-text>`,
+  content: `<mj-text font-size="14px" color="#333333" padding-top="10px" padding-right="0px" padding-bottom="10px" padding-left="0px">Edit your text here</mj-text>`,
 };
 
 export const headingBlock: BlockProperties = {
@@ -20,7 +20,7 @@ export const headingBlock: BlockProperties = {
   media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path d="M4 6h16M4 10h8M4 14h16M4 18h8"/>
   </svg>`,
-  content: `<mj-text font-size="24px" font-weight="bold" color="#111111" padding="0px">Your Heading</mj-text>`,
+  content: `<mj-text font-size="24px" font-weight="bold" color="#111111" padding-top="10px" padding-right="0px" padding-bottom="10px" padding-left="0px">Your Heading</mj-text>`,
 };
 
 export const imageBlock: BlockProperties = {
@@ -32,7 +32,7 @@ export const imageBlock: BlockProperties = {
     <circle cx="8.5" cy="8.5" r="1.5"/>
     <path d="M21 15l-5-5L5 21"/>
   </svg>`,
-  content: `<mj-image src="https://via.placeholder.com/600x200" alt="" width="100%" padding="0px"></mj-image>`,
+  content: `<mj-image src="https://via.placeholder.com/600x200" alt="" padding="0px"></mj-image>`,
 };
 
 export const buttonBlock: BlockProperties = {

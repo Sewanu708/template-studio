@@ -1,5 +1,4 @@
 import type { ComponentSchema } from '../schemas/component-schema';
-import { BORDER_STYLE_OPTIONS } from './common';
 
 export const mjWrapperSchema: ComponentSchema = {
   type: 'mj-wrapper',
@@ -94,30 +93,38 @@ export const mjWrapperSchema: ComponentSchema = {
         },
         {
           name: 'border',
-          label: 'Border',
+          label: 'All Sides',
           type: 'border',
           defaultValue: 'none',
           placeholder: '1px solid #e5e7eb',
         },
         {
-          name: 'border-style',
-          label: 'Border Style',
-          type: 'select',
+          name: 'border-top',
+          label: 'Top Border',
+          type: 'border',
           defaultValue: 'none',
-          options: BORDER_STYLE_OPTIONS,
+          placeholder: '1px solid #e5e7eb',
         },
         {
-          name: 'border-width',
-          label: 'Border Width',
-          type: 'unit',
-          defaultValue: '',
-          units: ['px'],
+          name: 'border-right',
+          label: 'Right Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
         },
         {
-          name: 'border-color',
-          label: 'Border Color',
-          type: 'color',
-          defaultValue: '',
+          name: 'border-bottom',
+          label: 'Bottom Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
+        },
+        {
+          name: 'border-left',
+          label: 'Left Border',
+          type: 'border',
+          defaultValue: 'none',
+          placeholder: '1px solid #e5e7eb',
         },
       ],
     },

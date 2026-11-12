@@ -21,9 +21,9 @@ export const editorConfig: EditorConfig = {
   components: `<mjml>
   <mj-head></mj-head>
   <mj-body background-color="#ffffff">
-    <mj-section background-color="#ffffff" padding="0px">
+    <mj-section background-color="#ffffff" padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
       <mj-column padding="0px">
-        <mj-text align="center" color="#6b7280" font-size="16px" padding="0px">
+        <mj-text align="center" color="#6b7280" font-size="16px" padding-top="10px" padding-right="0px" padding-bottom="10px" padding-left="0px">
           Start with this text or drag a block from the Add panel.
         </mj-text>
       </mj-column>
@@ -44,6 +44,8 @@ export const editorConfig: EditorConfig = {
 
   assetManager: {
     upload: false,
+    showUrlInput: true,
+    noAssets: 'No images yet. Upload one or paste a URL.',
     assets: [],
   },
 
@@ -51,6 +53,15 @@ export const editorConfig: EditorConfig = {
   storageManager: false,
 
   undoManager: true,
+
+  richTextEditor: {
+    actions: [
+      'bold',
+      'italic',
+      'underline',
+      'link',
+    ],
+  },
 
   deviceManager: {
     devices: [

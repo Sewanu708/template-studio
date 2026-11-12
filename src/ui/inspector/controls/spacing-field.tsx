@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 interface SpacingFieldProps {
   label: string;
@@ -21,124 +21,73 @@ export function SpacingField({
   helpText,
 }: SpacingFieldProps) {
   const sides = parseSpacing(value);
-  const [isLinked, setIsLinked] = useState(() => (
-    sides.top === sides.right && sides.right === sides.bottom && sides.bottom === sides.left
-  ));
 
   const handleSideChange = (side: keyof ParsedSides, rawVal: string) => {
     const formatted = formatWithUnit(rawVal);
-    if (isLinked) {
-      onChange(`${formatted}`);
-      return;
-    }
-
     const nextSides = { ...sides, [side]: formatted };
     onChange(`${nextSides.top} ${nextSides.right} ${nextSides.bottom} ${nextSides.left}`);
-  };
-
-  const handleToggleLinked = () => {
-    if (!isLinked) {
-      // Transitioning to linked: apply top value to all sides
-      setIsLinked(true);
-      onChange(sides.top);
-    } else {
-      setIsLinked(false);
-      onChange(`${sides.top} ${sides.right} ${sides.bottom} ${sides.left}`);
-    }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <span style={styles.label}>{label}</span>
-        <button
-          type="button"
-          style={{
-            ...styles.linkToggle,
-            color: isLinked ? '#16a34a' : '#9ca3af',
-            background: isLinked ? '#f0fdf4' : 'transparent',
-            border: isLinked ? '1px solid #86efac' : '1px solid #e5e7eb',
-          }}
-          onClick={handleToggleLinked}
-          title={isLinked ? 'Sides linked (click to unlink)' : 'Sides independent (click to link)'}
-          aria-label={isLinked ? 'Unlink padding sides' : 'Link padding sides'}
-        >
-          {isLinked ? '🔗 Linked' : '🔓 Unlinked'}
-        </button>
+        <span style={styles.unitHint}>px</span>
       </div>
 
-      {isLinked ? (
-        <div style={styles.linkedRow}>
-          <span style={styles.sideHint}>All sides:</span>
+      <div style={styles.boxGrid}>
+        <div style={styles.boxItemTop}>
+          <span style={styles.boxLabel}>Top</span>
           <input
             type="text"
             value={stripUnit(sides.top)}
             placeholder="0"
             onChange={(e) => handleSideChange('top', e.target.value)}
-            style={styles.linkedInput}
-            aria-label="All sides padding in px"
+            style={styles.boxInput}
+            aria-label="Top padding in px"
           />
-          <span style={styles.unitSuffix}>px</span>
         </div>
-      ) : (
-        <div style={styles.boxGrid}>
-          {/* Top */}
-          <div style={styles.boxItemTop}>
-            <span style={styles.boxLabel}>Top</span>
+
+        <div style={styles.middleRow}>
+          <div style={styles.boxItem}>
+            <span style={styles.boxLabel}>Left</span>
             <input
               type="text"
-              value={stripUnit(sides.top)}
+              value={stripUnit(sides.left)}
               placeholder="0"
-              onChange={(e) => handleSideChange('top', e.target.value)}
+              onChange={(e) => handleSideChange('left', e.target.value)}
               style={styles.boxInput}
-              aria-label="Top padding in px"
+              aria-label="Left padding in px"
             />
           </div>
 
-          <div style={styles.middleRow}>
-            {/* Left */}
-            <div style={styles.boxItem}>
-              <span style={styles.boxLabel}>Left</span>
-              <input
-                type="text"
-                value={stripUnit(sides.left)}
-                placeholder="0"
-                onChange={(e) => handleSideChange('left', e.target.value)}
-                style={styles.boxInput}
-                aria-label="Left padding in px"
-              />
-            </div>
+          <div style={styles.centerBadge}>PAD</div>
 
-            <div style={styles.centerBadge}>PAD</div>
-
-            {/* Right */}
-            <div style={styles.boxItem}>
-              <span style={styles.boxLabel}>Right</span>
-              <input
-                type="text"
-                value={stripUnit(sides.right)}
-                placeholder="0"
-                onChange={(e) => handleSideChange('right', e.target.value)}
-                style={styles.boxInput}
-                aria-label="Right padding in px"
-              />
-            </div>
-          </div>
-
-          {/* Bottom */}
-          <div style={styles.boxItemBottom}>
-            <span style={styles.boxLabel}>Bottom</span>
+          <div style={styles.boxItem}>
+            <span style={styles.boxLabel}>Right</span>
             <input
               type="text"
-              value={stripUnit(sides.bottom)}
+              value={stripUnit(sides.right)}
               placeholder="0"
-              onChange={(e) => handleSideChange('bottom', e.target.value)}
+              onChange={(e) => handleSideChange('right', e.target.value)}
               style={styles.boxInput}
-              aria-label="Bottom padding in px"
+              aria-label="Right padding in px"
             />
           </div>
         </div>
-      )}
+
+        <div style={styles.boxItemBottom}>
+          <span style={styles.boxLabel}>Bottom</span>
+          <input
+            type="text"
+            value={stripUnit(sides.bottom)}
+            placeholder="0"
+            onChange={(e) => handleSideChange('bottom', e.target.value)}
+            style={styles.boxInput}
+            aria-label="Bottom padding in px"
+          />
+        </div>
+      </div>
 
       {helpText && <span style={styles.helpText}>{helpText}</span>}
     </div>
@@ -202,36 +151,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#374151',
     fontWeight: 600,
   },
-  linkToggle: {
-    fontSize: 11,
-    padding: '2px 6px',
-    borderRadius: 4,
-    cursor: 'pointer',
-    fontWeight: 500,
-    transition: 'all 120ms ease',
-  },
-  linkedRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sideHint: {
-    fontSize: 11,
-    color: '#6b7280',
-    width: 60,
-  },
-  linkedInput: {
-    flex: 1,
-    height: 26,
-    padding: '2px 8px',
-    fontSize: 12,
-    border: '1px solid #d1d5db',
-    borderRadius: 4,
-    color: '#111827',
-    background: '#ffffff',
-    outline: 'none',
-  },
-  unitSuffix: {
+  unitHint: {
     fontSize: 11,
     color: '#9ca3af',
   },

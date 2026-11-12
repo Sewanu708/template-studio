@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import GjsEditor, { Canvas } from '@grapesjs/react';
-import grapesjs, { type Editor, type Plugin } from 'grapesjs';
+import grapesjs, { type Component, type Editor, type Plugin } from 'grapesjs';
 import gjsMjmlModule from 'grapesjs-mjml';
 import { editorConfig } from './config/editor-config';
 import { canvasCommunicationPlugin } from './canvas/communication';
@@ -8,10 +8,20 @@ import { sectionControlsPlugin } from './canvas/section-controls';
 import { emailBuilderPlugin } from './plugins/builder';
 import { imageBehaviorPlugin } from './plugins/image-behavior';
 import { layoutBehaviorPlugin } from './plugins/layout-behavior';
+import { mjmlRenderRefreshPlugin } from './plugins/mjml-render-refresh';
+import { mjmlVisualDefaultsPlugin } from './plugins/mjml-visual-defaults';
+import { assetUploadPlugin } from './plugins/asset-upload';
+import { aiInlineTriggerPlugin } from './plugins/ai-inline-trigger';
+import { aiLockingPlugin } from './plugins/ai-locking';
+import { mjTextInlineEditingPlugin } from './plugins/mj-text-inline-editing';
+import type { AgentScope } from './ai/agent-types';
+import type { CapturedTextSelection } from './ai/text-selection-context';
 import { getCompiledHtml, getMjml } from './lib/serializer';
 import { TopToolbar } from '../ui/toolbar/top-toolbar';
 import { LeftSidebar } from '../ui/sidebar/left-sidebar';
 import { RightInspector } from '../ui/inspector/right-inspector';
+import { FloatingAiChat } from '../ui/ai/floating-ai-chat';
+import { UndoToast } from '../ui/ai/undo-toast';
 
 import 'grapesjs/dist/css/grapes.min.css';
 
@@ -52,9 +62,33 @@ export function EmailEditor() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [templateName, setTemplateName] = useState('Untitled email');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
+  const [aiChatState, setAiChatState] = useState<{
+    open: boolean;
+    scope: AgentScope;
+    target: Component;
+    textSelection?: CapturedTextSelection | null;
+  } | null>(null);
+  const [undoToast, setUndoToast] = useState<{
+    message: string;
+    undoFn: () => void;
+  } | null>(null);
 
   const handleEditor = (editorInstance: Editor) => {
     editorInstance.on('change:changesCount', () => setSaveStatus('unsaved'));
+    editorInstance.on(
+      'builder:ai:open',
+      ({
+        scope,
+        target,
+        textSelection,
+      }: {
+        scope: AgentScope;
+        target: Component;
+        textSelection?: CapturedTextSelection | null;
+      }) => {
+        setAiChatState({ open: true, scope, target, textSelection });
+      },
+    );
     setEditor(editorInstance);
   };
 
@@ -104,9 +138,15 @@ export function EmailEditor() {
           configuredMjmlPlugin,
           emailBuilderPlugin,
           imageBehaviorPlugin,
+          mjmlRenderRefreshPlugin,
+          mjmlVisualDefaultsPlugin,
+          assetUploadPlugin,
           layoutBehaviorPlugin,
           canvasCommunicationPlugin,
           sectionControlsPlugin,
+          mjTextInlineEditingPlugin,
+          aiInlineTriggerPlugin,
+          aiLockingPlugin,
         ],
       }}
       onEditor={handleEditor}
@@ -130,12 +170,39 @@ export function EmailEditor() {
           <main style={styles.canvasArea}>
             {/* @grapesjs/react Canvas — renders the GrapesJS iframe */}
             <Canvas style={styles.canvas} />
+
+            {/* Floating AI Chat */}
+            {editor && aiChatState?.open && (
+              <FloatingAiChat
+                editor={editor}
+                scope={aiChatState.scope}
+                target={aiChatState.target}
+                initialTextSelection={aiChatState.textSelection}
+                open={aiChatState.open}
+                onClose={() => setAiChatState(null)}
+                onUndoAvailable={(undoFn) => {
+                  setUndoToast({
+                    message: 'AI updated email. Click Undo to revert.',
+                    undoFn,
+                  });
+                }}
+              />
+            )}
           </main>
 
           <aside style={styles.inspector}>
             <RightInspector editor={editor} />
           </aside>
         </div>
+
+        {/* Global Undo Notification Toast */}
+        {undoToast && (
+          <UndoToast
+            message={undoToast.message}
+            onUndo={undoToast.undoFn}
+            onDismiss={() => setUndoToast(null)}
+          />
+        )}
       </div>
     </GjsEditor>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 interface RadiusFieldProps {
   label: string;
@@ -21,114 +21,66 @@ export function RadiusField({
   clientWarning,
 }: RadiusFieldProps) {
   const corners = parseRadius(value);
-  const [isLinked, setIsLinked] = useState(() => (
-    corners.topLeft === corners.topRight
-    && corners.topRight === corners.bottomRight
-    && corners.bottomRight === corners.bottomLeft
-  ));
 
   const handleCornerChange = (corner: keyof ParsedCorners, rawVal: string) => {
     const formatted = formatWithPx(rawVal);
-    if (isLinked) {
-      onChange(formatted);
-      return;
-    }
-
     const next = { ...corners, [corner]: formatted };
     onChange(`${next.topLeft} ${next.topRight} ${next.bottomRight} ${next.bottomLeft}`);
-  };
-
-  const handleToggleLinked = () => {
-    if (!isLinked) {
-      setIsLinked(true);
-      onChange(corners.topLeft);
-    } else {
-      setIsLinked(false);
-      onChange(`${corners.topLeft} ${corners.topRight} ${corners.bottomRight} ${corners.bottomLeft}`);
-    }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <span style={styles.label}>{label}</span>
-        <button
-          type="button"
-          style={{
-            ...styles.linkToggle,
-            color: isLinked ? '#16a34a' : '#9ca3af',
-            background: isLinked ? '#f0fdf4' : 'transparent',
-            border: isLinked ? '1px solid #86efac' : '1px solid #e5e7eb',
-          }}
-          onClick={handleToggleLinked}
-          title={isLinked ? 'Corners linked (click to unlink)' : 'Corners independent (click to link)'}
-          aria-label={isLinked ? 'Unlink corner radii' : 'Link corner radii'}
-        >
-          {isLinked ? '🔗 Linked' : '🔓 Unlinked'}
-        </button>
+        <span style={styles.unitHint}>px</span>
       </div>
 
-      {isLinked ? (
-        <div style={styles.linkedRow}>
-          <span style={styles.hint}>All corners:</span>
+      <div style={styles.grid}>
+        <div style={styles.cornerItem}>
+          <span style={styles.cornerLabel}>TL</span>
           <input
             type="text"
             value={stripPx(corners.topLeft)}
             placeholder="0"
             onChange={(e) => handleCornerChange('topLeft', e.target.value)}
-            style={styles.linkedInput}
-            aria-label="All corners radius in px"
+            style={styles.cornerInput}
+            aria-label="Top-left radius in px"
           />
-          <span style={styles.unitSuffix}>px</span>
         </div>
-      ) : (
-        <div style={styles.grid}>
-          <div style={styles.cornerItem}>
-            <span style={styles.cornerLabel}>TL</span>
-            <input
-              type="text"
-              value={stripPx(corners.topLeft)}
-              placeholder="0"
-              onChange={(e) => handleCornerChange('topLeft', e.target.value)}
-              style={styles.cornerInput}
-              aria-label="Top-left radius in px"
-            />
-          </div>
-          <div style={styles.cornerItem}>
-            <span style={styles.cornerLabel}>TR</span>
-            <input
-              type="text"
-              value={stripPx(corners.topRight)}
-              placeholder="0"
-              onChange={(e) => handleCornerChange('topRight', e.target.value)}
-              style={styles.cornerInput}
-              aria-label="Top-right radius in px"
-            />
-          </div>
-          <div style={styles.cornerItem}>
-            <span style={styles.cornerLabel}>BL</span>
-            <input
-              type="text"
-              value={stripPx(corners.bottomLeft)}
-              placeholder="0"
-              onChange={(e) => handleCornerChange('bottomLeft', e.target.value)}
-              style={styles.cornerInput}
-              aria-label="Bottom-left radius in px"
-            />
-          </div>
-          <div style={styles.cornerItem}>
-            <span style={styles.cornerLabel}>BR</span>
-            <input
-              type="text"
-              value={stripPx(corners.bottomRight)}
-              placeholder="0"
-              onChange={(e) => handleCornerChange('bottomRight', e.target.value)}
-              style={styles.cornerInput}
-              aria-label="Bottom-right radius in px"
-            />
-          </div>
+        <div style={styles.cornerItem}>
+          <span style={styles.cornerLabel}>TR</span>
+          <input
+            type="text"
+            value={stripPx(corners.topRight)}
+            placeholder="0"
+            onChange={(e) => handleCornerChange('topRight', e.target.value)}
+            style={styles.cornerInput}
+            aria-label="Top-right radius in px"
+          />
         </div>
-      )}
+        <div style={styles.cornerItem}>
+          <span style={styles.cornerLabel}>BL</span>
+          <input
+            type="text"
+            value={stripPx(corners.bottomLeft)}
+            placeholder="0"
+            onChange={(e) => handleCornerChange('bottomLeft', e.target.value)}
+            style={styles.cornerInput}
+            aria-label="Bottom-left radius in px"
+          />
+        </div>
+        <div style={styles.cornerItem}>
+          <span style={styles.cornerLabel}>BR</span>
+          <input
+            type="text"
+            value={stripPx(corners.bottomRight)}
+            placeholder="0"
+            onChange={(e) => handleCornerChange('bottomRight', e.target.value)}
+            style={styles.cornerInput}
+            aria-label="Bottom-right radius in px"
+          />
+        </div>
+      </div>
 
       {clientWarning && (
         <div style={styles.warningBox}>
@@ -195,35 +147,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#374151',
     fontWeight: 600,
   },
-  linkToggle: {
-    fontSize: 11,
-    padding: '2px 6px',
-    borderRadius: 4,
-    cursor: 'pointer',
-    fontWeight: 500,
-  },
-  linkedRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  hint: {
-    fontSize: 11,
-    color: '#6b7280',
-    width: 70,
-  },
-  linkedInput: {
-    flex: 1,
-    height: 26,
-    padding: '2px 8px',
-    fontSize: 12,
-    border: '1px solid #d1d5db',
-    borderRadius: 4,
-    color: '#111827',
-    background: '#ffffff',
-    outline: 'none',
-  },
-  unitSuffix: {
+  unitHint: {
     fontSize: 11,
     color: '#9ca3af',
   },

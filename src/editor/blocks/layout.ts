@@ -30,7 +30,7 @@ export const oneColumnBlock: LayoutBlockProperties = {
   media: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <rect x="3" y="4" width="18" height="16" rx="1"/>
   </svg>`,
-  content: `<mj-section padding="0px">
+  content: `<mj-section padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
   <mj-column padding="0px"></mj-column>
 </mj-section>`,
   builderLayout: {
@@ -48,7 +48,7 @@ export const twoColumnBlock: LayoutBlockProperties = {
     <rect x="3" y="4" width="8" height="16" rx="1"/>
     <rect x="13" y="4" width="8" height="16" rx="1"/>
   </svg>`,
-  content: `<mj-section padding="0px">
+  content: `<mj-section padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
   <mj-column width="50%" padding="0px"></mj-column>
   <mj-column width="50%" padding="0px"></mj-column>
 </mj-section>`,
@@ -68,7 +68,7 @@ export const threeColumnBlock: LayoutBlockProperties = {
     <rect x="9" y="4" width="6" height="16" rx="1"/>
     <rect x="16" y="4" width="6" height="16" rx="1"/>
   </svg>`,
-  content: `<mj-section padding="0px">
+  content: `<mj-section padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
   <mj-column width="33.333%" padding="0px"></mj-column>
   <mj-column width="33.333%" padding="0px"></mj-column>
   <mj-column width="33.333%" padding="0px"></mj-column>
@@ -88,7 +88,7 @@ export const sidebarLayoutBlock: LayoutBlockProperties = {
     <rect x="3" y="4" width="5" height="16" rx="1"/>
     <rect x="10" y="4" width="11" height="16" rx="1"/>
   </svg>`,
-  content: `<mj-section padding="0px">
+  content: `<mj-section padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
   <mj-column width="33%" padding="0px"></mj-column>
   <mj-column width="67%" padding="0px"></mj-column>
 </mj-section>`,

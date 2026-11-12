@@ -1,11 +1,34 @@
-import type { Component, Plugin } from 'grapesjs';
+import type { Component, Editor, Plugin } from 'grapesjs';
 
-const EMPTY_SECTION = `<mj-section padding="0px">
+const EMPTY_SECTION = `<mj-section background-color="#ffffff" padding-top="20px" padding-right="0px" padding-bottom="20px" padding-left="0px">
   <mj-column padding="0px"></mj-column>
 </mj-section>`;
 
 type Direction = 'above' | 'below';
 type Action = 'add' | 'duplicate';
+
+function getBodyComponent(editor: Editor): Component | null {
+  const wrapper = editor.getWrapper();
+  if (!wrapper) return null;
+  const body = wrapper.find('mj-body')[0] ?? wrapper;
+  return body as Component;
+}
+
+function appendSection(editor: Editor, section: Component | null, direction: Direction, action: Action) {
+  const parent = section?.parent() ?? getBodyComponent(editor);
+  if (!parent) return null;
+
+  const content = action === 'duplicate' && section ? section.clone() : EMPTY_SECTION;
+  const at = section ? section.index() + (direction === 'below' ? 1 : 0) : parent.components().length;
+  const [inserted] = parent.append(content, { at });
+
+  if (inserted) {
+    editor.select(inserted);
+    inserted.view?.render?.();
+  }
+
+  return inserted;
+}
 
 export const sectionControlsPlugin: Plugin = (editor) => {
   let activeSection: Component | null = null;
@@ -26,24 +49,6 @@ export const sectionControlsPlugin: Plugin = (editor) => {
     }
 
     return null;
-  };
-
-  const getInsertIndex = (section: Component, direction: Direction): number => (
-    section.index() + (direction === 'below' ? 1 : 0)
-  );
-
-  const insertSection = (section: Component, direction: Direction, action: Action) => {
-    const parent = section.parent();
-    if (!parent) return;
-
-    const content = action === 'duplicate'
-      ? section.clone()
-      : EMPTY_SECTION;
-    const [inserted] = parent.append(content, {
-      at: getInsertIndex(section, direction),
-    });
-
-    if (inserted) editor.select(inserted);
   };
 
   const makeButton = (
@@ -68,7 +73,7 @@ export const sectionControlsPlugin: Plugin = (editor) => {
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      insertSection(section, direction, action);
+      appendSection(editor, section, direction, action);
     });
 
     return button;
@@ -88,7 +93,7 @@ export const sectionControlsPlugin: Plugin = (editor) => {
     return control;
   };
 
-  const renderControls = () => {
+  const renderSectionControls = () => {
     removeControls();
     if (!activeSection) return;
 
@@ -102,6 +107,41 @@ export const sectionControlsPlugin: Plugin = (editor) => {
     controls = [topControl, bottomControl];
   };
 
+  const renderBodyAddButton = () => {
+    const body = getBodyComponent(editor);
+    if (!body) return;
+
+    const element = body.getEl();
+    if (!element) return;
+
+    const existing = element.querySelector('.builder-body-add-section');
+    if (existing) return;
+
+    const doc = element.ownerDocument;
+    const wrap = doc.createElement('div');
+    wrap.className = 'builder-body-add-section';
+
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.className = 'builder-body-add-section-button';
+    button.textContent = '+ Add Section';
+    button.title = 'Add a new section to the end of the email';
+    button.setAttribute('aria-label', button.title);
+
+    button.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      appendSection(editor, null, 'below', 'add');
+    });
+
+    wrap.appendChild(button);
+    element.appendChild(wrap);
+  };
+
   const syncSelection = () => {
     const selected = editor.getSelected();
     const nextSection = resolveSection(selected);
@@ -111,9 +151,15 @@ export const sectionControlsPlugin: Plugin = (editor) => {
       activeSection = nextSection;
     }
 
-    renderControls();
+    renderSectionControls();
   };
 
   editor.on('component:selected component:deselected', syncSelection);
-  editor.on('component:update component:add component:remove canvas:refresh', renderControls);
+  editor.on('component:update component:add component:remove canvas:refresh', () => {
+    renderSectionControls();
+    renderBodyAddButton();
+  });
+  editor.on('load', () => {
+    renderBodyAddButton();
+  });
 };

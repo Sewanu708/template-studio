@@ -10,6 +10,7 @@ export interface UploadResult {
   publicId?: string;
   width?: number;
   height?: number;
+  mimeType?: string;
 }
 
 /**
@@ -49,6 +50,7 @@ export async function uploadImageAsset(file: File): Promise<UploadResult> {
     publicId: data.public_id,
     width: data.width,
     height: data.height,
+    mimeType: file.type,
   };
 }
 

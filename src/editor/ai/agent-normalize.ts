@@ -19,6 +19,10 @@ const TEXT_DEFAULTS: Record<string, string> = {
 
 const SIDE_ATTRS = ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'] as const;
 
+function stripHtmlComments(mjml: string): string {
+  return mjml.replace(/<!--[\s\S]*?-->/g, '');
+}
+
 function hasAttr(attrs: string, attr: string): boolean {
   return new RegExp(`\\b${attr}\\s*=`, 'i').test(attrs);
 }
@@ -120,6 +124,81 @@ function repairColumnBackgroundAttributes(mjml: string): string {
   });
 }
 
+function repairButtonInnerPaddingAttributes(mjml: string): string {
+  const buttonRegex = /<mj-button(\s+[^>]*|\s*)>/gi;
+
+  return mjml.replace(buttonRegex, (match, attrString) => {
+    const rawAttrs: string = attrString || '';
+    const sideAttrs = {
+      top: getAttrValue(rawAttrs, 'inner-padding-top'),
+      right: getAttrValue(rawAttrs, 'inner-padding-right'),
+      bottom: getAttrValue(rawAttrs, 'inner-padding-bottom'),
+      left: getAttrValue(rawAttrs, 'inner-padding-left'),
+    };
+
+    if (!Object.values(sideAttrs).some(Boolean)) return match;
+
+    let nextAttrs = rawAttrs
+      .replace(
+        /\s*\binner-padding-(?:top|right|bottom|left)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+        '',
+      )
+      .trim();
+
+    if (!hasAttr(nextAttrs, 'inner-padding')) {
+      const top = sideAttrs.top ?? '10px';
+      const right = sideAttrs.right ?? '25px';
+      const bottom = sideAttrs.bottom ?? top;
+      const left = sideAttrs.left ?? right;
+
+      nextAttrs = `${nextAttrs}${nextAttrs ? ' ' : ''}inner-padding="${top} ${right} ${bottom} ${left}"`;
+    }
+
+    return `<mj-button${nextAttrs ? ` ${nextAttrs}` : ''}>`;
+  });
+}
+
+function removeAttributeFromOpeningTags(mjml: string, attrName: string): string {
+  const attrRegex = new RegExp(
+    `\\s+${attrName}\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+)`,
+    'gi',
+  );
+
+  return mjml.replace(/<mj-[a-z0-9-]+(\s+[^>]*|\s*)>/gi, (match) =>
+    match.replace(attrRegex, ''),
+  );
+}
+
+/**
+ * Keeps full-template replacements aligned with the editor's canvas model.
+ *
+ * The builder stores visual styling directly on body components. Model output
+ * often tries to use mj-head defaults, mj-style, css-class, and comments; those
+ * can create non-body/head components in GrapesJS or invisible styling that the
+ * inspector cannot represent. For template apply, keep the body and body attrs,
+ * but reset mj-head to the builder-safe empty head.
+ */
+function normalizeTemplateDocument(mjml: string): string {
+  let normalized = stripHtmlComments(mjml.trim());
+
+  const bodyMatch = normalized.match(/<mj-body\b([^>]*)>([\s\S]*?)<\/mj-body>/i);
+  if (bodyMatch) {
+    const bodyAttrs = (bodyMatch[1] || '').trim();
+    const bodyContent = bodyMatch[2].trim();
+
+    normalized = `<mjml><mj-head></mj-head><mj-body${bodyAttrs ? ` ${bodyAttrs}` : ''}>${bodyContent}</mj-body></mjml>`;
+  } else {
+    normalized = normalized
+      .replace(/<mj-head\b[\s\S]*?<\/mj-head>/gi, '<mj-head></mj-head>')
+      .replace(/<mj-style\b[\s\S]*?<\/mj-style>/gi, '')
+      .replace(/<mj-attributes\b[\s\S]*?<\/mj-attributes>/gi, '');
+  }
+
+  normalized = removeAttributeFromOpeningTags(normalized, 'css-class');
+
+  return normalized;
+}
+
 /**
  * Repairs simple malformed structures where direct primitives live in mj-section
  * without an enclosing mj-column:
@@ -154,14 +233,21 @@ function repairSectionColumns(mjml: string): string {
  * 1. Safely wraps direct section primitives in mj-column if needed.
  * 2. Applies visual padding defaults for mj-section and mj-text.
  */
-export function normalizeAgentMjml(mjml: string, _scope: AgentScope): string {
+export function normalizeAgentMjml(mjml: string, scope: AgentScope): string {
   let normalized = mjml.trim();
+
+  if (scope === 'template') {
+    normalized = normalizeTemplateDocument(normalized);
+  } else {
+    normalized = stripHtmlComments(normalized);
+  }
 
   // 1. Repair direct content inside sections
   normalized = repairSectionColumns(normalized);
 
   // 2. Repair common illegal MJML attrs returned by models
   normalized = repairColumnBackgroundAttributes(normalized);
+  normalized = repairButtonInnerPaddingAttributes(normalized);
 
   // 3. Apply explicit visual padding defaults
   normalized = applyTagPaddingDefaults(

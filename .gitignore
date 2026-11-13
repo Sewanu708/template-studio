@@ -27,3 +27,17 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+canvas-layout-goals.md
+email-template-builder-build-plan.md
+mjml-visual-defaults-implementation-brief.md
+.agents/skills/grill-me/SKILL.md
+.agents/skills/grill-me/agents/openai.yaml
+skills-lock.json
+agentic-ai-email-builder-prd.md
+agentic-ai-hidden-style-retry-plan.md
+agentic-ai-phase-2-implementation-brief.md
+agentic-ai-phase-2-subphase-plan.md
+ai-text-selection-formatting-prd.md
+editor-ux-section-and-inline-rte-plan.md
+agentic-ai-phase-1-implementation-brief.md
+agentic-ai-mj-attributes-flattening-prd.md

@@ -4,6 +4,8 @@ export const AI_SUPPORTED_TAGS = new Set([
   'mj-section',
   'mj-column',
   'mj-group',
+  'mj-wrapper',
+  'mj-hero',
   'mj-text',
   'mj-image',
   'mj-button',
@@ -19,19 +21,46 @@ const FORBIDDEN_TAGS = new Set([
   'script',
   'style',
   'table',
+  'mj-style',
   'mj-raw',
   'iframe',
   'object',
   'embed',
+]);
+
+// Tags forbidden in component/section scope but allowed in template scope
+const ROOT_ONLY_TAGS = new Set([
   'mjml',
   'mj-head',
   'mj-body',
   'wrapper',
 ]);
 
+const TEMPLATE_ROOT_TAGS = new Set([
+  'mjml',
+  'mj-head',
+  'mj-body',
+]);
+
+const ALLOWED_MJML_CHILDREN = new Set([
+  'mj-head',
+  'mj-body',
+]);
+
+const ALLOWED_BODY_CHILDREN = new Set([
+  'mj-section',
+  'mj-wrapper',
+  'mj-hero',
+]);
+
 const ALLOWED_SECTION_CHILDREN = new Set([
   'mj-column',
   'mj-group',
+]);
+
+const ALLOWED_WRAPPER_CHILDREN = new Set([
+  'mj-section',
+  'mj-hero',
 ]);
 
 const ALLOWED_COLUMN_CHILDREN = new Set([
@@ -93,7 +122,42 @@ export function validateBuilderStructure(
   }
 
   // 1. Check scope-level roots
-  if (scope === 'component') {
+  if (scope === 'template') {
+    if (topElements.length !== 1) {
+      throw new Error(
+        `Template scope requires exactly 1 root element, but found ${topElements.length}.`,
+      );
+    }
+    const rootTag = topElements[0].tagName.toLowerCase();
+    if (rootTag !== 'mjml') {
+      throw new Error(
+        `Invalid template root tag <${rootTag}>. Expected <mjml>.`,
+      );
+    }
+
+    // Template must contain mj-body
+    const mjBody = root.querySelector('mj-body');
+    if (!mjBody) {
+      throw new Error(
+        'Template must contain <mj-body>.',
+      );
+    }
+
+    const mjHead = root.querySelector('mj-head');
+    if (mjHead && mjHead.children.length > 0) {
+      throw new Error(
+        'Template <mj-head> must be empty. Put all editable styling directly on body components.',
+      );
+    }
+
+    // Template must contain at least one mj-section
+    const sections = root.querySelectorAll('mj-section');
+    if (sections.length === 0) {
+      throw new Error(
+        'Template must contain at least one <mj-section>.',
+      );
+    }
+  } else if (scope === 'component') {
     if (topElements.length !== 1) {
       throw new Error(
         `Component scope requires exactly 1 root element, but found ${topElements.length}.`,
@@ -127,6 +191,13 @@ export function validateBuilderStructure(
     if (FORBIDDEN_TAGS.has(tagName)) {
       throw new Error(
         `Security/structure violation: <${tagName}> is not allowed in AI generated emails.`,
+      );
+    }
+
+    // Root-only tags forbidden in non-template scopes
+    if (scope !== 'template' && ROOT_ONLY_TAGS.has(tagName)) {
+      throw new Error(
+        `Structure violation: <${tagName}> is only allowed in template scope.`,
       );
     }
 
@@ -168,10 +239,15 @@ export function validateBuilderStructure(
     // Inside mj-text, children are rich text HTML, so we don't enforce MJML hierarchy on them
     let ancestor = el.parentElement;
     let insideMjText = false;
+    let insideMjHead = false;
     while (ancestor && ancestor !== root) {
-      if (ancestor.tagName.toLowerCase() === 'mj-text') {
+      const ancestorTag = ancestor.tagName.toLowerCase();
+      if (ancestorTag === 'mj-text') {
         insideMjText = true;
         break;
+      }
+      if (ancestorTag === 'mj-head') {
+        insideMjHead = true;
       }
       ancestor = ancestor.parentElement;
     }
@@ -179,7 +255,40 @@ export function validateBuilderStructure(
       continue;
     }
 
-    // Top-level MJML elements must be supported tags
+    // In full-template scope, mj-head can contain MJML head configuration tags
+    // like mj-attributes/mj-all/mj-class. They are still covered by the global
+    // security scan above, but they don't follow body component hierarchy rules.
+    if (scope === 'template' && insideMjHead) {
+      continue;
+    }
+
+    if (scope === 'template' && TEMPLATE_ROOT_TAGS.has(tagName)) {
+      if (tagName === 'mjml') {
+        for (const child of Array.from(el.children)) {
+          const childTag = child.tagName.toLowerCase();
+          if (!ALLOWED_MJML_CHILDREN.has(childTag)) {
+            throw new Error(
+              `<mjml> cannot directly contain <${childTag}>. Allowed children are <mj-head> and <mj-body>.`,
+            );
+          }
+        }
+      }
+
+      if (tagName === 'mj-body') {
+        for (const child of Array.from(el.children)) {
+          const childTag = child.tagName.toLowerCase();
+          if (!ALLOWED_BODY_CHILDREN.has(childTag)) {
+            throw new Error(
+              `<mj-body> cannot directly contain <${childTag}>. Expected <mj-section>, <mj-wrapper>, or <mj-hero>.`,
+            );
+          }
+        }
+      }
+
+      continue;
+    }
+
+    // Body MJML elements must be supported tags
     if (!AI_SUPPORTED_TAGS.has(tagName)) {
       throw new Error(
         `Unsupported MJML element: <${tagName}> is not supported by the builder.`,
@@ -193,6 +302,18 @@ export function validateBuilderStructure(
         if (!ALLOWED_SECTION_CHILDREN.has(childTag)) {
           throw new Error(
             `<mj-section> cannot directly contain <${childTag}>. Allowed children are <mj-column> or <mj-group>.`,
+          );
+        }
+      }
+    }
+
+    // Check children of mj-wrapper
+    if (tagName === 'mj-wrapper') {
+      for (const child of Array.from(el.children)) {
+        const childTag = child.tagName.toLowerCase();
+        if (!ALLOWED_WRAPPER_CHILDREN.has(childTag)) {
+          throw new Error(
+            `<mj-wrapper> cannot directly contain <${childTag}>. Expected <mj-section> or <mj-hero>.`,
           );
         }
       }

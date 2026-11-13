@@ -4,6 +4,8 @@ import type {
   AgentScope,
   AgentTargetContext,
   AgentTextSelectionContext,
+  CanvasSummary,
+  ConversationMessage,
   MentionedAsset,
 } from './agent-types';
 import { getMjml } from '../lib/serializer';
@@ -130,5 +132,37 @@ export function buildAgentRequest(params: {
     target: targetContext,
     textSelection,
     mentionedAssets,
+  };
+}
+
+/**
+ * Builds an AgentRequest for full template generation.
+ * Does not require a selected target component.
+ */
+export function buildTemplateAgentRequest(params: {
+  editor: Editor;
+  prompt: string;
+  mentionedAssets: MentionedAsset[];
+  canvasSummary?: CanvasSummary;
+  sessionContext?: string;
+  conversationHistory?: ConversationMessage[];
+}): AgentRequest {
+  const {
+    editor,
+    prompt,
+    mentionedAssets,
+    canvasSummary,
+    sessionContext,
+    conversationHistory,
+  } = params;
+
+  return {
+    scope: 'template',
+    prompt,
+    fullMjml: normalizeAgentMjml(getMjml(editor), 'template'),
+    mentionedAssets,
+    canvasSummary,
+    sessionContext,
+    conversationHistory,
   };
 }

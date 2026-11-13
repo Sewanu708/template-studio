@@ -1,6 +1,24 @@
 import type { Editor } from 'grapesjs';
 import type { MentionedAsset } from './agent-types';
 
+const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+};
+
+export function inferImageMimeType(urlOrName: string): string | undefined {
+  const withoutQuery = urlOrName.split('?')[0]?.split('#')[0] ?? '';
+  const extension = withoutQuery.split('.').pop()?.toLowerCase();
+
+  if (!extension) return undefined;
+
+  return IMAGE_MIME_BY_EXTENSION[extension];
+}
+
 /**
  * Retrieves all image assets registered in GrapesJS AssetManager.
  */
@@ -18,6 +36,9 @@ export function getAvailableAssets(editor: Editor): MentionedAsset[] {
         const src = String(getFn('src') ?? (typeof obj.getSrc === 'function' ? (obj.getSrc as () => unknown)() : '') ?? '').trim();
         const name = String(getFn('name') ?? '').trim();
         const id = String(getFn('id') ?? obj.cid ?? `asset-${idx}`);
+        const mimeType = String(getFn('mimeType') ?? getFn('mime_type') ?? '').trim()
+          || inferImageMimeType(src)
+          || inferImageMimeType(name);
 
         const fallbackName = src.split('/').pop()?.split('?')[0] || `Image ${idx + 1}`;
 
@@ -25,6 +46,7 @@ export function getAvailableAssets(editor: Editor): MentionedAsset[] {
           id,
           name: name || fallbackName,
           url: src,
+          mimeType,
         };
       })
       .filter((asset: MentionedAsset) => Boolean(asset.url));

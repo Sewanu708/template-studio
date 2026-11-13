@@ -9,6 +9,7 @@ import { validateAgentScope } from './agent-scope';
 import { validateBuilderStructure } from './agent-structure';
 import { normalizeAgentMjml } from './agent-normalize';
 import { sanitizeInlineHtml } from './text-selection-context';
+import { validateNoHiddenTemplateStyling } from './agent-hidden-style-validation';
 
 /**
  * Wraps candidate MJML snippet in root document tags so it can be compiled by the MJML engine.
@@ -17,9 +18,14 @@ export function wrapCandidateForCompile(
   mjml: string,
   scope: AgentScope,
 ): string {
+  if (scope === 'template') {
+    // Template scope already has full <mjml> document
+    return mjml;
+  }
   if (scope === 'component') {
     return `<mjml><mj-body><mj-section><mj-column>${mjml}</mj-column></mj-section></mj-body></mjml>`;
   }
+  // section scope
   return `<mjml><mj-body>${mjml}</mj-body></mjml>`;
 }
 
@@ -121,13 +127,29 @@ export function validateAndPrepareAgentResponse(params: {
     );
   }
 
+  // Template scope
+  if (request.scope === 'template' && response.type === 'replace-template') {
+    const normalizedMjml = normalizeAgentMjml(response.mjml, 'template');
+    validateNoHiddenTemplateStyling(normalizedMjml, 'template');
+    validateBuilderStructure(normalizedMjml, 'template');
+    compileCandidateMjml(normalizedMjml, 'template', editor);
+
+    return {
+      response,
+      normalizedMjml,
+    };
+  }
+
   // 3. Normalization (safe defaults + wrapper repair)
   const normalizedMjml = normalizeAgentMjml(response.mjml, request.scope);
 
-  // 4. Structure validation
+  // 4. Hidden-style validation (before structure check)
+  validateNoHiddenTemplateStyling(normalizedMjml, request.scope);
+
+  // 5. Structure validation
   validateBuilderStructure(normalizedMjml, request.scope);
 
-  // 5. Compile validation
+  // 6. Compile validation
   compileCandidateMjml(normalizedMjml, request.scope, editor);
 
   return {

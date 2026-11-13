@@ -9,6 +9,7 @@ interface TopToolbarProps {
   onPreview: () => void;
   onExportMjml: () => void;
   onExportHtml: () => void;
+  onOpenAi: () => void;
 }
 
 export function TopToolbar({
@@ -19,6 +20,7 @@ export function TopToolbar({
   onPreview,
   onExportMjml,
   onExportHtml,
+  onOpenAi,
 }: TopToolbarProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const [device, setDevice] = useState<'Desktop' | 'Mobile'>('Desktop');
@@ -99,6 +101,21 @@ export function TopToolbar({
 
       {/* Right */}
       <div style={styles.group}>
+        <button style={styles.aiBtn} onClick={onOpenAi} title="Generate with AI">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+          </svg>
+          AI
+        </button>
         <button style={styles.secondaryBtn} onClick={onPreview}>Preview</button>
         <div style={styles.exportMenu}>
           <button
@@ -220,5 +237,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     color: '#374151',
     textAlign: 'left',
+  },
+  aiBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '6px 12px',
+    borderRadius: 6,
+    fontSize: 13,
+    color: '#ffffff',
+    fontWeight: 600,
+    boxShadow: '0 1px 2px rgba(99, 102, 241, 0.2)',
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
   },
 };

@@ -96,9 +96,9 @@ export function ImageSettingsPanel({
     setUploadError(null);
 
     try {
-      const { url } = await uploadImageAsset(file);
+      const { url, mimeType } = await uploadImageAsset(file);
       // Add to asset manager so it shows up in the picker too.
-      editor.AssetManager.add([{ src: url, name: file.name, type: 'image' }]);
+      editor.AssetManager.add([{ src: url, name: file.name, type: 'image', mimeType }]);
       onChange('src', url);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed. Check your connection and try again.');

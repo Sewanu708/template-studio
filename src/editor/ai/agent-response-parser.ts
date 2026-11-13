@@ -102,7 +102,26 @@ export function parseAgentResponse(raw: string): AgentResponse {
     };
   }
 
+  if (candidate.type === 'replace-template') {
+    if (typeof candidate.summary !== 'string') {
+      throw new Error('AI replace-template response missing "summary".');
+    }
+    if (typeof candidate.explanation !== 'string') {
+      throw new Error('AI replace-template response missing "explanation".');
+    }
+    if (typeof candidate.mjml !== 'string' || !candidate.mjml.trim()) {
+      throw new Error('AI replace-template response missing non-empty "mjml".');
+    }
+
+    return {
+      type: 'replace-template',
+      summary: candidate.summary,
+      explanation: candidate.explanation,
+      mjml: candidate.mjml.trim(),
+    };
+  }
+
   throw new Error(
-    `Unsupported AI response type: "${String(candidate.type)}". Expected "replace-component", "replace-section", "replace-text-selection", or "answer".`,
+    `Unsupported AI response type: "${String(candidate.type)}". Expected "replace-component", "replace-section", "replace-text-selection", "replace-template", or "answer".`,
   );
 }

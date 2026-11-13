@@ -39,8 +39,8 @@ export const assetUploadPlugin: Plugin = (editor) => {
       await Promise.all(
         files.map(async (file) => {
           try {
-            const { url, fileName } = await uploadImageAsset(file);
-            am.add([{ src: url, name: fileName, type: 'image' }]);
+            const { url, fileName, mimeType } = await uploadImageAsset(file);
+            am.add([{ src: url, name: fileName, type: 'image', mimeType }]);
           } catch (err) {
             console.error('[asset-upload] image upload failed:', (err as Error).message);
           }

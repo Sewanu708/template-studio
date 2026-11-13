@@ -65,7 +65,7 @@ export function EmailEditor() {
   const [aiChatState, setAiChatState] = useState<{
     open: boolean;
     scope: AgentScope;
-    target: Component;
+    target?: Component | null;
     textSelection?: CapturedTextSelection | null;
   } | null>(null);
   const [undoToast, setUndoToast] = useState<{
@@ -83,7 +83,7 @@ export function EmailEditor() {
         textSelection,
       }: {
         scope: AgentScope;
-        target: Component;
+        target?: Component | null;
         textSelection?: CapturedTextSelection | null;
       }) => {
         setAiChatState({ open: true, scope, target, textSelection });
@@ -162,6 +162,9 @@ export function EmailEditor() {
           onPreview={handlePreview}
           onExportMjml={handleExportMjml}
           onExportHtml={handleExportHtml}
+          onOpenAi={() => {
+            setAiChatState({ open: true, scope: 'template', target: null });
+          }}
         />
 
         <div style={styles.workspace}>

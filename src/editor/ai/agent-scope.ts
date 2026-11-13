@@ -128,7 +128,50 @@ export function validateAgentScope(
     return;
   }
 
-  if (response.targetId !== request.target.id) {
+  // Template scope validation
+  if (request.scope === 'template') {
+    if (response.type !== 'replace-template') {
+      throw new Error(
+        `Template scope request must return "replace-template", received "${response.type}".`,
+      );
+    }
+
+    // replace-template responses should not have targetId
+    if ('targetId' in response && (response as { targetId?: string }).targetId) {
+      throw new Error(
+        'Template scope response should not include a targetId.',
+      );
+    }
+
+    const roots = extractMjmlRoots(response.mjml);
+    if (roots.length === 0) {
+      throw new Error('Template response is empty or missing tags.');
+    }
+
+    if (roots[0].tagName !== 'mjml') {
+      throw new Error(
+        `Template response must start with <mjml>, but found <${roots[0].tagName}>.`,
+      );
+    }
+    return;
+  }
+
+  // Non-template scopes must not return replace-template
+  if (response.type === 'replace-template') {
+    throw new Error(
+      `Non-template scope "${request.scope}" cannot receive "replace-template" response.`,
+    );
+  }
+
+  // For non-template scopes, target is required
+  if (!request.target) {
+    throw new Error(
+      `Non-template scope "${request.scope}" requires a target, but none was provided.`,
+    );
+  }
+
+  // Validate targetId matches for mutation responses
+  if ('targetId' in response && response.targetId !== request.target.id) {
     throw new Error(
       `AI response targetId "${response.targetId}" does not match current target "${request.target.id}".`,
     );
@@ -220,5 +263,6 @@ export function validateAgentScope(
     if (!response.replacementHtml.trim()) {
       throw new Error('Text-selection response replacementHtml cannot be empty.');
     }
+    return;
   }
 }
